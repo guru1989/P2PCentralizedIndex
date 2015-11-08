@@ -200,7 +200,7 @@ def getdata(line):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	tport = int(words[3])
 	trfcno = words[0] # used as string below
-	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" %(words[0], words[2], platform.system(), os.name)
+	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" %(words[0], words[2], platform.system(), os.name)     # Host : ip address of requesting peer
 	s.connect((words[2], tport))	
 	s.send(bytes(msg))
 	msg = s.recv(1024)
