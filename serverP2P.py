@@ -66,10 +66,12 @@ class myThread (threading.Thread):
 				msg = self.client.recv(1024)				
 				msg = msg.decode('UTF-8')				
 				line = msg.split('\n')
+
 				
-				word = line[0].split(' ')
+				word = line[0].split(' ')                                        
 				host = line[1].split(' ')[1]			
-				port = line[2].split(' ')[1]
+				port = line[2].split(' ')[1]  
+
 				
 				if(word[0]=='ADD'):
 					if(word[3] == 'P2P-CI/1.0'):
@@ -140,7 +142,7 @@ def main():
 	port = 7734
 	s.bind((host, port))
 	prev = []
-	s.listen(5)
+	s.listen(5)             # parameter is the max number of server backlog connections
 	conn = 0
 	while True:
 		conn+=1

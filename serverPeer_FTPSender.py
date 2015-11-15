@@ -5,21 +5,16 @@ import util
 import threading
 import time
 
-def prepareDatagram(seq_no):
-  try:
-    f = open(FILENAME, 'r')
-  except IOError as e:
-    print("File Not Found!\n")
-    sys.exit(1)
-
-  f.seek(seq_no * MSS)
-  content = f.read(MSS)
-  f.close()
+def prepareDatagram(seq_no, data):
+  startIndex = seq_no * MSS
+  content = data[startIndex:startIndex+MSS]
+  
   if not content: return None
 
   # print "seq_no: " + str(seq_no)
   hdr = util.buildHeader(seq_no, content, 0)
   return hdr + content
+
 
 def receiver():
   # receive data from server (data, addr)
@@ -71,7 +66,7 @@ def timerHandler():
   global EXPIRED
   EXPIRED = 1
 
-def rdt_send(clientAddr):
+def rdt_send(clientAddr, data):
   global TO_SEND_SEQ
   global SEND_BUF
   global SEND_BUF_SEQ
@@ -84,7 +79,7 @@ def rdt_send(clientAddr):
   checkpoint = 0
   while 1:
     if len(SEND_BUF_SEQ) < N:
-      m = prepareDatagram(TO_SEND_SEQ)
+      m = prepareDatagram(TO_SEND_SEQ, data)
       if not m:
         if endSignal == 1:
           print "making END"
@@ -131,59 +126,45 @@ def rdt_send(clientAddr):
       TIMER.start()
       THREAD_LOCK.release()
 
-def main(argv):
-  print argv
-  global HOSTNAME
-  global PORT
-  global FILENAME
-  global N
-  global MSS
-  global TO_SEND_SEQ
-  global receiverThread
-  global LASTACK
-  global EXIT_THREAD
-  global SEND_BUF
-  global SEND_BUF_SEQ
-  global EXPIRED
-  global TIMER_SET
-  global THREAD_LOCK
-  global s
-  SERVERNAME = socket.gethostbyname(socket.gethostname())
-  PORT = 7735
-  MSS = 1000
-  N = 121
-  FILENAME = 'test.txt'
-  TO_SEND_SEQ = 0
-  LASTACK = -1
-  EXIT_THREAD = 0
-  SEND_BUF = []
-  SEND_BUF_SEQ = []
-  EXPIRED = 0
-  TIMER_SET = 0.1 
-  THREAD_LOCK = threading.Lock()
+def FTPsender(clientAddr, msg):
+  
+    global HOSTNAME
+    global PORT
+    global FILENAME
+    global N
+    global MSS
+    global TO_SEND_SEQ
+    global receiverThread
+    global LASTACK
+    global EXIT_THREAD
+    global SEND_BUF
+    global SEND_BUF_SEQ
+    global EXPIRED
+    global TIMER_SET
+    global THREAD_LOCK
+    global s
+  
+    MSS = 1000
+    N = 121
+  
+    TO_SEND_SEQ = 0
+    LASTACK = -1
+    EXIT_THREAD = 0
+    SEND_BUF = []
+    SEND_BUF_SEQ = []
+    EXPIRED = 0
+    TIMER_SET = 0.1 
+    THREAD_LOCK = threading.Lock()
 
-  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  print(s)
-  s.bind((SERVERNAME, PORT))
-  conn=0
-
-  while True:
-    conn+=1
-    data, clientAddr = s.recvfrom(1024)
-    print()
-    print('*'*20 + "Msg Start" + '*'*20)
-    print(data)
-    print(clientAddr)
-    print('*'*20 + "Msg End" + '*'*22)
-    print()
-
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  
     # This block is for receiving acknowledgements.
     receiverThread = threading.Thread(target=receiver)
     receiverThread.start()
     start = time.time()
 
     # rdt_send is to send data segments to client.
-    rdt_send(clientAddr)
+    rdt_send(clientAddr, msg)
     while len(SEND_BUF) > 0:
         print LASTACK
         print TO_SEND_SEQ
@@ -193,7 +174,7 @@ def main(argv):
     print "FINISHED!"
     EXIT_THREAD = 1
     receiverThread.join()
-    s.close()
+    
 
 def signal_handler(signal, frame):
   global EXIT_THREAD

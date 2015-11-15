@@ -9,6 +9,8 @@ import sys
 import platform
 import datetime
 import re
+import serverPeer_FTPSender
+import clientPeer_FTPReceiver
 
 ipstr = "1. Add RFCs locally\n2. ADD RFCs to Server\n3. Lookup\n4. List"
 rfc = list()
@@ -34,17 +36,17 @@ class myThread (threading.Thread):
 	def run(self):
 		if(self.opt=="upload"):			
 			while(True):				
-				client,addr = self.sock.accept()
+				data, clientAddr = self.sock.recvfrom(1024)
 				print('*'*40)
-				print(client)
-				print(addr)
+				print(data)
+				print(clientAddr)
 				print('*'*40) 
 								
-				thread = myThread("replytopeer", client=client,addr=addr)
+				thread = myThread("replytopeer", msg=data,addr=clientAddr)
 				thread.start()
 		else: # cmp(self.opt,"replytopeer")==0
-			msg = self.client.recv(1024)
-			msg = msg.decode('UTF-8')
+			#msg = self.client.recv(1024)
+			msg = self.msg.decode('UTF-8')
 			print()
 			print('*'*20 + "Msg Start" + '*'*20)
 			print(msg)
@@ -70,7 +72,7 @@ class myThread (threading.Thread):
 				msg = "P2P-CI/1.0 400 Bad Request\nDate: %s, %s %s %s %s\nOS: %s %s" %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
 			else: # If Version doesn't match
 				msg = "P2P-CI/1.0 505 P2P-CI Version Not Supported\nDate: %s, %s %s %s %s\nOS: %s %s" %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
-			self.client.send(bytes(msg))
+			serverPeer_FTPSender.FTPsender(self.addr, bytes(msg))
 
 class pseudoThread(): # Not a THREAD
 	def __init__(self, opt, sock=None, client=None, addr=None, uphost=None, upport=None, option=None):
@@ -141,16 +143,16 @@ class pseudoThread(): # Not a THREAD
 					getdata(lines[x])
 
 def main():
-	uploadServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	uploadServer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	uploadServerHost = socket.gethostbyname(socket.gethostname())
 	uploadServerPort = random.randint(49152,65535)
 	uploadServer.bind((uploadServerHost,uploadServerPort))
-	uploadServer.listen(5)
+	#uploadServer.listen(5)
 	print("Listening on Host: %s & Port: %s" %(uploadServerHost,uploadServerPort))
 	thread = myThread("upload", sock=uploadServer,uphost=uploadServerHost,upport=uploadServerPort)
 	thread.start()
 
-	host = "152.46.20.161"      # IP address of server
+	host = socket.gethostname()      # IP address of server
 	port = 7734
 	
 	count = 0
@@ -172,8 +174,8 @@ def main():
 					print("RFC already exists")
 				else:
 					rfc.append(RFC(rfcno,rfcdesc))
-					f = open('%s.txt' %rfcno, 'w')
-					f.write("rfc")
+					f = open('%s.txt' %rfcno, 'r')
+					#f.write("rfc")
 					f.close()
 					print("RFC# %s having Title: \"%s\" added to the list. Total Count of RFCs: %s" %(rfc[len(rfc)-1].rfcno, rfc[len(rfc)-1].rfcdesc, len(rfc)))	
 					#print ipstr
@@ -197,26 +199,26 @@ def getdata(line):
 	#print("Line: " + line)
 	global ipstr
 	words = line.split(" ")
-	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	tport = int(words[3])
 	trfcno = words[0] # used as string below
 	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" %(words[0], words[2], platform.system(), os.name)     # Host : ip address of requesting peer
-	s.connect((words[2], tport))	
-	s.send(bytes(msg))
-	msg = s.recv(1024)
+	#s.connect((words[2], tport))	
+	s.sendto(bytes(msg),(words[2], tport))
+	msg =  clientPeer_FTPReceiver.FTPReceiver(s)
 	msg = msg.decode('UTF-8')
-	print()
-	print('*'*20 + "Msg Start" + '*'*20)
-	print(msg)
-	print('*'*20 + "Msg End" + '*'*22)
-	print()	
+	#print()
+	#print('*'*20 + "Msg Start" + '*'*20)
+	#print(msg)
+	#print('*'*20 + "Msg End" + '*'*22)
+	#print()	
 	lines = msg.split('\n')
 	words = lines[0].split(' ')
 	if (words[1]=='200'): # (words[0]=='P2P-CI/1.0') and (words[1]=='200')
 		try:
-			f = open('%s_%s.txt' %(trfcno, str(tport)), 'w')
+			f = open('%s.txt' %trfcno, 'w')
 			for i in range(6,len(lines)):
-				f.write(lines[i])
+				f.write(lines[i]+"\n")
 			f.close()
 		except IOError as e:
 			print("File Not Found")	

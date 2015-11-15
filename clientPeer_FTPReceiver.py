@@ -5,41 +5,20 @@ import util
 import random
 
 
-SERVERNAME = '152.46.20.161'
-PORT = 7735
-MAX_SIZE = 1100
-
-# Create a UDP socket
-try:
-  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  print 'Socket created'
-except socket.error, msg:
-  print 'Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
-  sys.exit()
-
-def main(argv):
-  print argv
-  global newFile
+def FTPReceiver(s):
   global P
-
-  # By default, P = 0.05, receive filename = 'rec.doc'
+  # By default, P = 0.05
   P = 0.05
-  filename = 'test.txt'
-
   
-
-  # Connect to server 
-  s.sendto('Initiate Connection',(SERVERNAME, PORT))
-  newFile = open(filename, 'w+')
-
   # Initialize the Sequence number
   lastSEQNO = -1
   max_seq_no = -1
   firstTime = True
   MSS = 0
   oldSEQNO = -1
+  buffer=""
 
-  # Listening to port
+ 
   while 1:
     packet = s.recvfrom(MAX_SIZE)
     data = packet[0]
@@ -70,7 +49,7 @@ def main(argv):
     if errno == 0:
       if seq_no == lastSEQNO + 1:
         lastSEQNO = seq_no
-        newFile.write(dataText)
+        buffer+=dataText
       reply = util.buildHeader(lastSEQNO+1, '', 1)
       s.sendto(reply, serverAddr)
     elif errno == 1:
@@ -88,10 +67,8 @@ def main(argv):
         print "Transfer finished!"
         print "SEQ_NO "+str((lastSEQNO+1)*MSS)+ " is sent!"
         break
-
-  newFile.close()
   s.close()
-  sys.exit(0)
+  return buffer
 
 def signal_handler(signal, frame):
   print("\nCtrl+C detected! Exiting...")
