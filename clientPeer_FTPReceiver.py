@@ -20,7 +20,7 @@ def FTPReceiver(s):
 
  
   while 1:
-    packet = s.recvfrom(MAX_SIZE)
+    packet = s.recvfrom(1100)
     data = packet[0]
     serverAddr = packet[1]
 

@@ -12,16 +12,15 @@ import re
 import serverPeer_FTPSender
 import clientPeer_FTPReceiver
 
-ipstr = "1. Add RFCs locally\n2. ADD RFCs to Server\n3. Lookup\n4. List"
+ipstr = "1. ADD RFCs to Server\n2. Lookup\n3. List"
 rfc = list()
-rfcsent = 0 # will keep counter of how many RFCs have been sent to the server and will only send those RFCs which have not been sent
 
 class RFC():
 	def __init__(self, rfcno, rfcdesc):
 		self.rfcno = rfcno
 		self.rfcdesc = rfcdesc
 
-class myThread (threading.Thread):
+class myThread(threading.Thread):
 	def __init__(self, opt, sock=None, client=None, addr=None, uphost=None, upport=None, option=None, msg=None):		
 		threading.Thread.__init__(self)
 		self.opt = opt
@@ -34,13 +33,13 @@ class myThread (threading.Thread):
 		self.msg = msg		
 	
 	def run(self):
-		if(self.opt=="upload"):			
+		if(self.opt == "upload"):			
 			while(True):				
 				data, clientAddr = self.sock.recvfrom(1024)
-				print('*'*40)
+				print('*' * 40)
 				print(data)
 				print(clientAddr)
-				print('*'*40) 
+				print('*' * 40) 
 								
 				thread = myThread("replytopeer", msg=data,addr=clientAddr)
 				thread.start()
@@ -48,107 +47,115 @@ class myThread (threading.Thread):
 			#msg = self.client.recv(1024)
 			msg = self.msg.decode('UTF-8')
 			print()
-			print('*'*20 + "Msg Start" + '*'*20)
+			print('*' * 20 + "Msg Start" + '*' * 20)
 			print(msg)
-			print('*'*20 + "Msg End" + '*'*22)
+			print('*' * 20 + "Msg End" + '*' * 22)
 			print()			
 			lines = msg.split('\n')
 			words = lines[0].split(' ')
-			if(words[0]=="GET" and words[3]=="P2P-CI/1.0"):
+			if(words[0] == "GET" and words[3] == "P2P-CI/1.0"):
 				t = datetime.datetime.now()				
 				try:					
-					filename = '%s.txt' %words[2]
+					filename = '%s.txt' % words[2]
 					f = open(filename, 'r')
 					statbuf = os.stat(filename)	
 					msg = "P2P-CI/1.0 200 OK\nDate: %s, %s %s %s %s\nOS: %s %s\nLast Modified: %s\nContent-Length: %s\nContent-Type: text/plain\n" \
-					   %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name,statbuf.st_mtime,statbuf.st_size)
+					   % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name,statbuf.st_mtime,statbuf.st_size)
 					msg+=f.read()												
 				except IOError as e:
 					msg = "P2P-CI/1.0 404 Not Found\nDate: %s, %s %s %s %s\nOS: %s %s\nLast Modified: %s\nContent-Length: %s\nContent-Type: text/plain\n" \
-					   %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name,statbuf.st_mtime,statbuf.st_size)
+					   % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name,statbuf.st_mtime,statbuf.st_size)
 					print("I/O error({0}): {1}".format(e.errno, e.strerror))
 					msg+="File Not Found"
 			elif words[0] != "GET":
-				msg = "P2P-CI/1.0 400 Bad Request\nDate: %s, %s %s %s %s\nOS: %s %s" %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
+				msg = "P2P-CI/1.0 400 Bad Request\nDate: %s, %s %s %s %s\nOS: %s %s" % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
 			else: # If Version doesn't match
-				msg = "P2P-CI/1.0 505 P2P-CI Version Not Supported\nDate: %s, %s %s %s %s\nOS: %s %s" %(t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
+				msg = "P2P-CI/1.0 505 P2P-CI Version Not Supported\nDate: %s, %s %s %s %s\nOS: %s %s" % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
 			serverPeer_FTPSender.FTPsender(self.addr, bytes(msg))
 
+
+
 class pseudoThread(): # Not a THREAD
-	def __init__(self, opt, sock=None, client=None, addr=None, uphost=None, upport=None, option=None):
-		self.opt = opt
+	def __init__(self, sock=None, client=None, addr=None, uphost=None, upport=None, option=None):
 		self.option = option
 		self.sock = sock
 		self.uphost = uphost
 		self.upport = upport
 		self.client = client
 		self.addr = addr
-	
+
+
 	def start(self):
-		if(self.opt=="server"): #connect to server			
-			if(self.option==2):
-				global rfcsent
-				while(rfcsent != len(rfc)):					
-					tmpmsg = "ADD RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" %(rfc[rfcsent].rfcno,socket.gethostbyname(socket.gethostname()),self.upport,rfc[rfcsent].rfcdesc)					
-					self.sock.send(bytes(tmpmsg))
-					tmpmsg = self.sock.recv(1024)
-					tmpmsg = tmpmsg.decode('UTF-8')
-					print()
-					print('*'*20 + "Msg Start" + '*'*20)
-					print(tmpmsg)
-					print('*'*20 + "Msg End" + '*'*22)
-					print()
-					rfcsent+=1					
-			elif(self.option==3): # Lookup
-				temprfcno = getinput("Enter RFC# to query to Server: ")
-				temptitle = input("Enter the Title of the RFC: ")
-				tmpmsg = "LOOKUP RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" %(temprfcno,socket.gethostbyname(socket.gethostname()),self.upport,temptitle)
-				#tmpmsg = "LOOKUP RFC %s P2P-CI/1.1\nHost: %s\nPort: %s\nTitle: %s" %(temprfcno,socket.gethostbyname(socket.gethostname()),self.upport,temptitle)
-				#tmpmsg = "LOOK RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" %(temprfcno,socket.gethostbyname(socket.gethostname()),self.upport,temptitle)
-				self.sock.send(bytes(tmpmsg))
-				print('*'*40)				
-				msg=self.sock.recv(4096).rstrip()
-				msg = msg.decode('UTF-8')
-				print()
-				print('*'*20 + "Msg Start" + '*'*20)
-				print(msg)
-				print('*'*20 + "Msg End" + '*'*22)
-				print()
+		# 1 ADD RFCs to Server
+		if(self.option == 1):		
+			rfcno = raw_input("Enter RFC#: ")
+			rfcdesc = raw_input("Enter Title for RFC: ")
+			rfcPresent = False
+			for r in rfc:
+				if r.rfcno == rfcno:						
+					rfcPresent = True
+					break
+			if(rfcPresent):
+				print("RFC already exists")
+			else:
+				addRFCtoServer(rfcno, rfcdesc, self.upport, self.sock)
+
+		# 2 Lookup
+		elif(self.option == 2):
+			temprfcno = getinput("Enter RFC# to query to Server: ")
+			temptitle = input("Enter the Title of the RFC: ")
+			tmpmsg = "LOOKUP RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" % (temprfcno,socket.gethostbyname(socket.gethostname()),self.upport,temptitle)
+			self.sock.send(bytes(tmpmsg))
+			print('*' * 40)				
+			msg = self.sock.recv(4096).rstrip()
+			msg = msg.decode('UTF-8')
+			print()
+			print('*' * 20 + "Msg Start" + '*' * 20)
+			print(msg)
+			print('*' * 20 + "Msg End" + '*' * 22)
+			print()
 								
-				lines = msg.split('\n')				
+			lines = msg.split('\n')				
 								
-				for i in range(1,len(lines)):
-					print(str(i) + " --> " + lines[i])
-				print("0 --> Do Nothing")
-				x = int(input("Select Option: "))
-				if (x>=1 and x<len(lines)):
-					getdata(lines[x])
-			elif(self.option==4): # List
-				tmpmsg = "LIST ALL P2P-CI/1.0\nHost: %s\nPort: %s\n" %(socket.gethostbyname(socket.gethostname()),self.upport)				
-				self.sock.send(bytes(tmpmsg))
-				msg=self.sock.recv(4096)				
-				msg = msg.decode('UTF-8')
-				msg = msg.rstrip()
-				print()
-				print('*'*20 + "Msg Start" + '*'*20)
-				print(msg)
-				print('*'*20 + "Msg End" + '*'*22)
-				print()
-				lines = msg.split('\n')								
-				for i in range(1,len(lines)):
-					print(str(i) + " --> " + lines[i])
-				print("0 --> Do Nothing")
-				x = int(input("Select Option: "))
-				if (x>=1 and x<len(lines)):
-					getdata(lines[x])
+			for i in range(1,len(lines)):
+				print(str(i) + " --> " + lines[i])
+			print("0 --> Do Nothing")
+			x = int(input("Select Option: "))
+			if (x >= 1 and x < len(lines)):
+				if getdata(lines[x]):
+					addRFCtoServer(temprfcno, temptitle, self.upport, self.sock)
+
+
+		# 3. LIST
+		elif(self.option == 3): 
+			tmpmsg = "LIST ALL P2P-CI/1.0\nHost: %s\nPort: %s\n" % (socket.gethostbyname(socket.gethostname()),self.upport)				
+			self.sock.send(bytes(tmpmsg))
+			msg = self.sock.recv(4096)				
+			msg = msg.decode('UTF-8')
+			msg = msg.rstrip()
+			print()
+			print('*' * 20 + "Msg Start" + '*' * 20)
+			print(msg)
+			print('*' * 20 + "Msg End" + '*' * 22)
+			print()
+			lines = msg.split('\n')								
+			for i in range(1,len(lines)):
+				print(str(i) + " --> " + lines[i])
+			print("0 --> Do Nothing")
+			x = int(input("Select Option: "))
+			if (x >= 1 and x < len(lines)):
+				if getdata(lines[x]):
+					words = lines[x].split(" ")
+					rfcno = words[0]
+					rfctitle = words[1]
+					addRFCtoServer(rfcno, rfctitle, self.upport, self.sock)
 
 def main():
 	uploadServer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	uploadServerHost = socket.gethostbyname(socket.gethostname())
 	uploadServerPort = random.randint(49152,65535)
 	uploadServer.bind((uploadServerHost,uploadServerPort))
-	#uploadServer.listen(5)
-	print("Listening on Host: %s & Port: %s" %(uploadServerHost,uploadServerPort))
+	print("Listening on Host: %s & Port: %s" % (uploadServerHost,uploadServerPort))
 	thread = myThread("upload", sock=uploadServer,uphost=uploadServerHost,upport=uploadServerPort)
 	thread.start()
 
@@ -162,29 +169,12 @@ def main():
 		print(ipstr)
 		try:
 			option = int(input()) # input() gives integer and raw_input() gives string
-			if(option==1):		
-				rfcno = getinput("Enter RFC#: ")
-				rfcdesc = input("Enter Title for RFC: ")
-				rfcPresent = False
-				for r in rfc:
-					if r.rfcno == rfcno:						
-						rfcPresent = True
-						break
-				if(rfcPresent):
-					print("RFC already exists")
-				else:
-					rfc.append(RFC(rfcno,rfcdesc))
-					f = open('%s.txt' %rfcno, 'r')
-					#f.write("rfc")
-					f.close()
-					print("RFC# %s having Title: \"%s\" added to the list. Total Count of RFCs: %s" %(rfc[len(rfc)-1].rfcno, rfc[len(rfc)-1].rfcdesc, len(rfc)))	
-					#print ipstr
-			elif(option>=2 and option <= 4):				
-				pthread = pseudoThread("server", sock=s, uphost=uploadServerHost, upport=uploadServerPort, option=option)
+			if(option==1 or option==2 or option==3):
+				pthread = pseudoThread(sock=s, uphost=uploadServerHost, upport=uploadServerPort, option=option)
 				pthread.start()				
 			else:
 				print("Incorrect Option Entered")
-				#print ipstr
+				print ipstr
 		except ValueError:
 			print("Invalid Characters Entered.")
 
@@ -195,32 +185,43 @@ def getinput(msg):
 		print("Invalid Characters enterd")
 		return getinput(msg)
 
+def addRFCtoServer(rfcno, rfcdesc, upport, soc):
+	f = open('%s.txt' % rfcno, 'r')
+	f.close()
+	rfc.append(RFC(rfcno,rfcdesc))
+	tmpmsg = "ADD RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" % (rfcno,socket.gethostbyname(socket.gethostname()),upport,rfcdesc)					
+	soc.send(bytes(tmpmsg))
+	tmpmsg = soc.recv(1024)
+	tmpmsg = tmpmsg.decode('UTF-8')
+	print()
+	print('*' * 20 + "Msg Start" + '*' * 20)
+	print(tmpmsg)
+	print('*' * 20 + "Msg End" + '*' * 22)
+	print()
+
 def getdata(line):
-	#print("Line: " + line)
-	global ipstr
 	words = line.split(" ")
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	tport = int(words[3])
 	trfcno = words[0] # used as string below
-	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" %(words[0], words[2], platform.system(), os.name)     # Host : ip address of requesting peer
-	#s.connect((words[2], tport))	
+	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" % (words[0], words[2], platform.system(), os.name)
 	s.sendto(bytes(msg),(words[2], tport))
-	msg =  clientPeer_FTPReceiver.FTPReceiver(s)
+	msg = clientPeer_FTPReceiver.FTPReceiver(s)
 	msg = msg.decode('UTF-8')
-	#print()
-	#print('*'*20 + "Msg Start" + '*'*20)
-	#print(msg)
-	#print('*'*20 + "Msg End" + '*'*22)
-	#print()	
 	lines = msg.split('\n')
 	words = lines[0].split(' ')
-	if (words[1]=='200'): # (words[0]=='P2P-CI/1.0') and (words[1]=='200')
+	if (words[1] == '200'): # (words[0]=='P2P-CI/1.0') and (words[1]=='200')
 		try:
-			f = open('%s.txt' %trfcno, 'w')
+			f = open('%s.txt' % trfcno, 'w')
 			for i in range(6,len(lines)):
-				f.write(lines[i]+"\n")
+				f.write(lines[i] + "\n")
 			f.close()
+			return True
+
+
 		except IOError as e:
 			print("File Not Found")	
+			return False
+	return False
 
 main()
