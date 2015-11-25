@@ -139,6 +139,7 @@ def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	print(s)
 	host = socket.gethostbyname(socket.gethostname())
+	print "Server IP address is "+host
 	port = 7734
 	s.bind((host, port))
 	prev = []

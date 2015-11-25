@@ -21,7 +21,7 @@ class RFC():
 		self.rfcdesc = rfcdesc
 
 class myThread(threading.Thread):
-	def __init__(self, opt, sock=None, client=None, addr=None, uphost=None, upport=None, option=None, msg=None):		
+	def __init__(self, opt, sock=None, client=None, addr=None, uphost=None, upport=None, option=None, msg=None, mss = 1000, n=10):		
 		threading.Thread.__init__(self)
 		self.opt = opt
 		self.option = option
@@ -31,7 +31,8 @@ class myThread(threading.Thread):
 		self.client = client
 		self.addr = addr
 		self.msg = msg		
-	
+		self.mss = mss
+		self.n = n
 	def run(self):
 		if(self.opt == "upload"):			
 			while(True):				
@@ -41,7 +42,7 @@ class myThread(threading.Thread):
 				print(clientAddr)
 				print('*' * 40) 
 								
-				thread = myThread("replytopeer", msg=data,addr=clientAddr)
+				thread = myThread("replytopeer", msg=data,addr=clientAddr, mss=self.mss, n = self.n)
 				thread.start()
 		else: # cmp(self.opt,"replytopeer")==0
 			#msg = self.client.recv(1024)
@@ -71,7 +72,7 @@ class myThread(threading.Thread):
 				msg = "P2P-CI/1.0 400 Bad Request\nDate: %s, %s %s %s %s\nOS: %s %s" % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
 			else: # If Version doesn't match
 				msg = "P2P-CI/1.0 505 P2P-CI Version Not Supported\nDate: %s, %s %s %s %s\nOS: %s %s" % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name)
-			serverPeer_FTPSender.FTPsender(self.addr, bytes(msg))
+			serverPeer_FTPSender.FTPsender(self.addr, bytes(msg), self.mss, self.n)
 
 
 
@@ -156,10 +157,12 @@ def main():
 	uploadServerPort = random.randint(49152,65535)
 	uploadServer.bind((uploadServerHost,uploadServerPort))
 	print("Listening on Host: %s & Port: %s" % (uploadServerHost,uploadServerPort))
-	thread = myThread("upload", sock=uploadServer,uphost=uploadServerHost,upport=uploadServerPort)
+	MSS = int(raw_input("Enter the MSS value for the server peer"))
+	N = int(raw_input("Enter the window size for the server peer"))
+	thread = myThread("upload", sock=uploadServer,uphost=uploadServerHost,upport=uploadServerPort, mss=MSS, n=N)
 	thread.start()
 
-	host = socket.gethostname()      # IP address of server
+	host =raw_input("Enter IP address of server to connect to")      # IP address of server
 	port = 7734
 	
 	count = 0
@@ -200,13 +203,14 @@ def addRFCtoServer(rfcno, rfcdesc, upport, soc):
 	print()
 
 def getdata(line):
+	P = float(raw_input("Enter the probability value for Probabilistic Loss Service"))
 	words = line.split(" ")
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	tport = int(words[3])
 	trfcno = words[0] # used as string below
 	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" % (words[0], words[2], platform.system(), os.name)
 	s.sendto(bytes(msg),(words[2], tport))
-	msg = clientPeer_FTPReceiver.FTPReceiver(s)
+	msg = clientPeer_FTPReceiver.FTPReceiver(s, P)
 	msg = msg.decode('UTF-8')
 	lines = msg.split('\n')
 	words = lines[0].split(' ')

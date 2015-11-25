@@ -126,7 +126,7 @@ def rdt_send(clientAddr, data):
       TIMER.start()
       THREAD_LOCK.release()
 
-def FTPsender(clientAddr, msg):
+def FTPsender(clientAddr, msg, mss, n):
   
     global HOSTNAME
     global PORT
@@ -144,8 +144,8 @@ def FTPsender(clientAddr, msg):
     global THREAD_LOCK
     global s
   
-    MSS = 1000
-    N = 121
+    MSS = mss
+    N = n
   
     TO_SEND_SEQ = 0
     LASTACK = -1

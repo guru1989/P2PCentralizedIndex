@@ -5,10 +5,10 @@ import util
 import random
 
 
-def FTPReceiver(s):
+def FTPReceiver(s, p=0.05):
   global P
   # By default, P = 0.05
-  P = 0.05
+  P = p
   
   # Initialize the Sequence number
   lastSEQNO = -1
