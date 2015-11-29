@@ -103,8 +103,8 @@ class pseudoThread(): # Not a THREAD
 
 		# 2 Lookup
 		elif(self.option == 2):
-			temprfcno = getinput("Enter RFC# to query to Server: ")
-			temptitle = input("Enter the Title of the RFC: ")
+			temprfcno = raw_input("Enter RFC# to query to Server: ")
+			temptitle = raw_input("Enter the Title of the RFC: ")
 			tmpmsg = "LOOKUP RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" % (temprfcno,socket.gethostbyname(socket.gethostname()),self.upport,temptitle)
 			self.sock.send(bytes(tmpmsg))
 			print('*' * 40)				
