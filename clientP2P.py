@@ -57,8 +57,12 @@ class myThread(threading.Thread):
 			if(words[0] == "GET" and words[3] == "P2P-CI/1.0"):
 				t = datetime.datetime.now()				
 				try:					
-					filename = '%s.txt' % words[2]
-					f = open(filename, 'r')
+					rfcTitle=""
+					for r in rfc:
+						if r.rfcno==words[2]:
+							rfcTitle = r.rfcdesc
+					filename = 'RFC%s, %s.pdf' %(words[2],rfcTitle)
+					f = open(filename, 'rb')
 					statbuf = os.stat(filename)	
 					msg = "P2P-CI/1.0 200 OK\nDate: %s, %s %s %s %s\nOS: %s %s\nLast Modified: %s\nContent-Length: %s\nContent-Type: text/plain\n" \
 					   % (t.strftime("%a"),t.strftime("%d"),t.strftime("%b"),t.strftime("%Y"),t.strftime("%H:%M:%S"),platform.system(),os.name,statbuf.st_mtime,statbuf.st_size)
@@ -89,8 +93,10 @@ class pseudoThread(): # Not a THREAD
 	def start(self):
 		# 1 ADD RFCs to Server
 		if(self.option == 1):		
-			rfcno = raw_input("Enter RFC#: ")
-			rfcdesc = raw_input("Enter Title for RFC: ")
+			rfcfileName = raw_input("Enter the file name of the RFC in the format RFCXXXX, Title.pdf")
+			matchObj = re.match(r'RFC([0-9]*), ([^.]*)',rfcfileName)
+			rfcno = matchObj.group(1)
+			rfcdesc = matchObj.group(2)
 			rfcPresent = False
 			for r in rfc:
 				if r.rfcno == rfcno:						
@@ -189,7 +195,7 @@ def getinput(msg):
 		return getinput(msg)
 
 def addRFCtoServer(rfcno, rfcdesc, upport, soc):
-	f = open('%s.txt' % rfcno, 'r')
+	f = open('RFC%s, %s.pdf' %(rfcno,rfcdesc), 'rb')
 	f.close()
 	rfc.append(RFC(rfcno,rfcdesc))
 	tmpmsg = "ADD RFC %s P2P-CI/1.0\nHost: %s\nPort: %s\nTitle: %s" % (rfcno,socket.gethostbyname(socket.gethostname()),upport,rfcdesc)					
@@ -208,15 +214,16 @@ def getdata(line):
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 	tport = int(words[3])
 	trfcno = words[0] # used as string below
+	trfctitle = words[1]
 	msg = "GET RFC %s P2P-CI/1.0\nHost: %s\nOS: %s %s" % (words[0], words[2], platform.system(), os.name)
 	s.sendto(bytes(msg),(words[2], tport))
 	msg = clientPeer_FTPReceiver.FTPReceiver(s, P)
-	msg = msg.decode('UTF-8')
+	#msg = msg.decode('UTF-8')
 	lines = msg.split('\n')
 	words = lines[0].split(' ')
 	if (words[1] == '200'): # (words[0]=='P2P-CI/1.0') and (words[1]=='200')
 		try:
-			f = open('%s.txt' % trfcno, 'w')
+			f = open('RFC%s, %s.pdf' %(trfcno,trfctitle), 'wb')
 			for i in range(6,len(lines)):
 				f.write(lines[i] + "\n")
 			f.close()
