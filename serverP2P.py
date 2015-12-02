@@ -1,20 +1,15 @@
 import socket
 import threading
 import re
+import signal
+import sys
 
 lock = threading.Lock()
 peerlist = list()
-rfc = list()
+rfclist = list()
 
-def displayPeer():
-	for p in peerlist:
-		print("P: %s %s" %(p.host,p.port))
-
-def displayRFC():
-	for r in rfc:
-		for hp in r.hostportlist:
-			print("R: %s %s %s %s" %(r.rfcno,r.title,hp.host,hp.port))
-
+''' Server maintains a peerlist containing all peers currently connected to it.
+    Each peer is an object containing the IP address and upload port number of the peer'''
 class Peers():
 	def __init__(self,host,port):
 		self.host = host
@@ -23,10 +18,24 @@ class Peers():
 	@staticmethod
 	def addPeer(host,port):
 		for p in peerlist:
-			if p.host == host and p.port == port:				
+			if p.host == host and p.port == port:
 				return
 		peerlist.append(Peers(host,port))
 
+	@staticmethod
+	def remPeer(host, port):
+		for peer in peerlist:
+			if peer.host==host and peer.port==port:
+				peerlist.remove(peer)
+
+	@staticmethod
+	def displayPeer():
+		for p in peerlist:
+			print("P: %s %s" %(p.host,p.port))
+
+
+''' Server maintains a rfclist containing all RFCs that can be downloaded from the P2P system.
+    Each RFC is an object containing the RFC number, RFC title, address & port number of the peer where it is available '''
 class RFC():
 	def __init__(self,rfcno,title,host,port):
 		self.rfcno = rfcno
@@ -36,22 +45,28 @@ class RFC():
 	
 	@staticmethod
 	def addRFC(rfcno,title,host,port):
-		for r in rfc:
+		for r in rfclist:
 			if r.rfcno == rfcno:
 				for hp in r.hostportlist:
 					if hp.host == host and hp.port == port:
 						return				
 				r.hostportlist.append(Peers(host,port))
 				return
-		rfc.append(RFC(rfcno,title,host,port))
+		rfclist.append(RFC(rfcno,title,host,port))
 	
 	@staticmethod	
-	def remRFC(host, port):		#l[:] = [tl for tl in l if tl>16]
-		for r in rfc:
-			r.hostportlist[:] = [hp for hp in r.hostportlist if hp.host!=host or hp.port!=port]          
+	def remRFC(host, port):
+		for r in rfclist:
+			r.hostportlist[:] = [hp for hp in r.hostportlist if hp.host!=host or hp.port!=port]
 
+	@staticmethod
+	def displayRFC():
+		for r in rfclist:
+			for hp in r.hostportlist:
+				print("R: %s %s %s %s" %(r.rfcno,r.title,hp.host,hp.port))
 
-class myThread (threading.Thread):
+''' Creating a separate thread to handle communication to each incoming peer'''
+class peerThread (threading.Thread):
 	def __init__(self, client, addr):
 		threading.Thread.__init__(self)
 		self.client = client 
@@ -66,13 +81,11 @@ class myThread (threading.Thread):
 				msg = self.client.recv(1024)				
 				msg = msg.decode('UTF-8')				
 				line = msg.split('\n')
-
-				
 				word = line[0].split(' ')                                        
 				host = line[1].split(' ')[1]			
 				port = line[2].split(' ')[1]  
 
-				
+                # Adding an RFC to the Server
 				if(word[0]=='ADD'):
 					if(word[3] == 'P2P-CI/1.0'):
 						rfcno = word[2]					
@@ -87,6 +100,8 @@ class myThread (threading.Thread):
 					else:
 						tmpmsg = "P2P-CI/1.0 505 P2P-CI Version Not Supported"
 						self.client.send(bytes(tmpmsg))
+
+                 # RFC Lookup from Server
 				elif(word[0]=='LOOKUP'):
 					if(word[3] == 'P2P-CI/1.0'):
 						rfcno = word[2]
@@ -94,7 +109,7 @@ class myThread (threading.Thread):
 						flag = False
 						tempmsg = ""
 						lock.acquire()
-						for r in rfc:
+						for r in rfclist:
 							if r.rfcno == rfcno and r.title == title:
 								flag = True
 								for hp in r.hostportlist:
@@ -110,11 +125,13 @@ class myThread (threading.Thread):
 					else:
 						tmpmsg = "P2P-CI/1.0 505 P2P-CI Version Not Supported"
 						self.client.send(bytes(tmpmsg))
+
+                # List all RFCs available in the P2P system
 				elif(word[0]=='LIST'):
 					if(word[2] == 'P2P-CI/1.0'):
 						tempmsg = ""
 						lock.acquire()
-						for r in rfc:
+						for r in rfclist:
 							for hp in r.hostportlist:
 								tempmsg += ("%s %s %s %s\n" %(r.rfcno,r.title,hp.host,hp.port))
 						lock.release()						
@@ -126,34 +143,40 @@ class myThread (threading.Thread):
 						self.client.send(bytes(tmpmsg))
 				else: # 400 Bad Request
 					tmpmsg = "P2P-CI/1.0 400 Bad Request"
-					self.client.send(bytes(tmpmsg))				
+					self.client.send(bytes(tmpmsg))
+
 			except Exception as e:
-				print("Error %s" %e)
-				print(self.addr[0] + "  Client ends connection  " + str(self.addr[1]))
-				print(host + "  Client's Upload Server also goes down  " + port)
-				RFC.remRFC(host, port)				
+				print("Client ends connection: (" +str(self.addr[0])+", "+str(self.addr[1])+")")
+				RFC.remRFC(host, port)
+				Peers.remPeer(host, port)
 				self.client.close()
 				break
 			
+
+
+
 def main():
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	host = socket.gethostbyname(socket.gethostname())
-	print "Server IP address is "+host
+	print "Server IP address is "+host+" listening on port 7734"
+	print "Waiting for incoming connections....."
 	port = 7734
 	s.bind((host, port))
 	prev = []
 	s.listen(5)             # parameter is the max number of server backlog connections
-	conn = 0
 	while True:
-		conn+=1
 		client, addr = s.accept()
 		print()
 		print('*'*20 + "Msg Start" + '*'*20)
-		print(client)
-		print(addr)
+		print("Client connected: "+str(addr))
 		print('*'*20 + "Msg End" + '*'*22)
 		print()
-		thread = myThread(client, addr)
+        # Spawn a new thread to handle each client
+		thread = peerThread(client, addr)
 		thread.start()		
 	
 main()
+
+
+
+

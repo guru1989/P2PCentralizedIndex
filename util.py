@@ -1,7 +1,6 @@
 import binascii
 
 # Calculate the checksum
-# Refer from http://codewiki.wikispaces.com/ip_checksum.py
 def calculate_checksum(data):  # Form the standard IP-suite checksum
   pos = len(data)
   if (pos & 1):  # If odd...
@@ -92,6 +91,3 @@ def parseDatagram(msg, type):
         errno = 0
 
     return errno, seq_no
-
-
-   

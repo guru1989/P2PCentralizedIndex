@@ -5,6 +5,9 @@ import util
 import threading
 import time
 
+
+ipstr = "Enter one of the following options:\n1. ADD RFCs to Server\n2. Lookup RFC from Server\n3. List all RFCs available in P2P system\n4. Exit"
+
 def prepareDatagram(seq_no, data):
   startIndex = seq_no * MSS
   content = data[startIndex:startIndex+MSS]
@@ -15,7 +18,7 @@ def prepareDatagram(seq_no, data):
   hdr = util.buildHeader(seq_no, content, 0)
   return hdr + content
 
-
+''' This method handles the acknowledgements received from the client peer during the FTP file transfer process'''
 def receiver():
   # receive data from server (data, addr)
   global LASTACK
@@ -82,7 +85,6 @@ def rdt_send(clientAddr, data):
       m = prepareDatagram(TO_SEND_SEQ, data)
       if not m:
         if endSignal == 1:
-          print "making END"
           endSignal = 0
           m = util.buildHeader(TO_SEND_SEQ, 'END', 2)
           m += 'END'
@@ -126,13 +128,12 @@ def rdt_send(clientAddr, data):
       TIMER.start()
       THREAD_LOCK.release()
 
+
+''' This method is called by clientP2P.py to initiate the FTP send process from sender peer'''
 def FTPsender(clientAddr, msg, mss, n):
   
-    global HOSTNAME
-    global PORT
-    global FILENAME
-    global N
-    global MSS
+    global N                # Window size
+    global MSS              # Maximum Segment Size
     global TO_SEND_SEQ
     global receiverThread
     global LASTACK
@@ -159,31 +160,19 @@ def FTPsender(clientAddr, msg, mss, n):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   
     # This block is for receiving acknowledgements.
-    receiverThread = threading.Thread(target=receiver)
-    receiverThread.start()
+    receiverAckThread = threading.Thread(target=receiver)
+    receiverAckThread.start()
     start = time.time()
 
-    # rdt_send is to send data segments to client.
+    # rdt_send is to send data segments to client peer.
     rdt_send(clientAddr, msg)
     while len(SEND_BUF) > 0:
         print LASTACK
         print TO_SEND_SEQ
         print len(SEND_BUF)
         continue
-    print "Used time: " + str(time.time() - start)
+    print "Total transfer time in seconds: " + str(time.time()-start)
     print "FINISHED!"
     EXIT_THREAD = 1
-    receiverThread.join()
-    
+    #receiverAckThread.join()
 
-def signal_handler(signal, frame):
-  global EXIT_THREAD
-  print("\nCtrl+C detected! Exiting...")
-  EXIT_THREAD = 1
-  receiverThread.join()
-  s.close()
-  sys.exit(0)
-
-if __name__ == "__main__":
-   signal.signal(signal.SIGINT, signal_handler)
-   main(sys.argv[1:])

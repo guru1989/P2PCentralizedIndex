@@ -6,8 +6,7 @@ import random
 
 
 def FTPReceiver(s, p=0.05):
-  global P
-  # By default, P = 0.05
+  global P                  # Probability of packet loss
   P = p
   
   # Initialize the Sequence number
@@ -24,8 +23,7 @@ def FTPReceiver(s, p=0.05):
     data = packet[0]
     serverAddr = packet[1]
 
-    if not data: 
-      print "HEY"
+    if not data:
       continue
 
     if firstTime:
@@ -69,13 +67,3 @@ def FTPReceiver(s, p=0.05):
         break
   s.close()
   return buffer
-
-def signal_handler(signal, frame):
-  print("\nCtrl+C detected! Exiting...")
-  s.close()
-  newFile.close()
-  sys.exit(0)
-
-if __name__ == "__main__":
-   signal.signal(signal.SIGINT, signal_handler)
-   main(sys.argv[1:])
